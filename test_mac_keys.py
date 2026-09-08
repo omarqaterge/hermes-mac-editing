@@ -33,6 +33,7 @@ from prompt_toolkit.key_binding import KeyBindings  # noqa: E402
 from prompt_toolkit.keys import Keys  # noqa: E402
 from prompt_toolkit.selection import SelectionState, SelectionType  # noqa: E402
 
+import iterm_install  # noqa: E402
 import mac_keys  # noqa: E402
 
 PASS = []
@@ -76,13 +77,27 @@ KEYS_BY_NAME = {name: fkey for _, (fkey, name) in mac_keys.CSI_U_SEQUENCES.items
 for name, fkey in KEYS_BY_NAME.items():
     check(f"bound:{name}", handler_for(kb, "escape", fkey) is not None)
 
-# 3. Native shift-selection sequences still parse.
+# 3. Terminal mappings emit sequences understood by stock Hermes TUI,
+# prompt_toolkit, and zsh without patching Hermes core.
+check("mapping:option-shift-left-is-meta-shift",
+      iterm_install.MAPPINGS["0xf702-0x2a0000"] == (10, "[1;4D"))
+check("mapping:option-shift-right-is-meta-shift",
+      iterm_install.MAPPINGS["0xf703-0x2a0000"] == (10, "[1;4C"))
+check("mapping:cmd-x-is-control-x",
+      iterm_install.MAPPINGS["0x78-0x100000-0x7"] == (11, "0x18"))
+check("mapping:option-delete-is-control-w",
+      iterm_install.PROFILE_MAPPINGS.get("0x7f-0x80000") == (11, "0x17"))
+
+# 4. Native shift-selection sequences still parse. The plugin rebinds the
+# prompt_toolkit interpretation of Meta+Shift arrows to its word-selection
+# key names; stock Hermes TUI decodes the same bytes as Meta+Shift arrows.
 for seq, key in [("\x1b[1;2D", Keys.ShiftLeft), ("\x1b[1;2H", Keys.ShiftHome),
-                 ("\x1b[1;2F", Keys.ShiftEnd), ("\x1b[1;6D", Keys.ControlShiftLeft),
-                 ("\x1b[1;6C", Keys.ControlShiftRight)]:
+                 ("\x1b[1;2F", Keys.ShiftEnd),
+                 ("\x1b[1;4D", Keys.ControlShiftLeft),
+                 ("\x1b[1;4C", Keys.ControlShiftRight)]:
     check(f"native:{key}", ANSI_SEQUENCES.get(seq) == key, repr(seq))
 
-# 4. Select all.
+# 5. Select all.
 event, _ = make_event("hello", cursor=2)
 handler_for(kb, "escape", KEYS_BY_NAME["mac-select-all"])(event)
 b = event.current_buffer
@@ -107,11 +122,15 @@ handler_for(kb, "escape", KEYS_BY_NAME["mac-copy"])(event)
 check("copy:interrupt-passthrough",
       len(fed) == 1 and fed[0].key == Keys.ControlC)
 
-# 7. Cut removes selection and copies it.
+# 7. Cut removes selection and copies it. Cmd+X emits Control-X so stock
+# Hermes TUI handles it; the classic CLI plugin binds that same byte.
 event, _ = make_event("hello world", cursor=5)
 event.current_buffer.selection_state = SelectionState(
     original_cursor_position=0, type=SelectionType.CHARACTERS)
-handler_for(kb, "escape", KEYS_BY_NAME["mac-cut"])(event)
+control_x_cut = handler_for(kb, Keys.ControlX)
+check("cut:control-x-bound", control_x_cut is not None)
+if control_x_cut is not None:
+    control_x_cut(event)
 check("cut:text", event.current_buffer.text == " world",
       repr(event.current_buffer.text))
 check("cut:clipboard",

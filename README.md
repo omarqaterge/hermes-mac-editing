@@ -8,7 +8,7 @@ This is a user plugin for [Hermes Agent](https://github.com/NousResearch/hermes-
 
 Terminal emulators don't have native text fields, so macOS shortcuts can't work out of the box. This plugin closes the gap in two places.
 
-First, iTerm2 key mappings translate your keypresses into standard terminal sequences. Arrow selection uses the same modified-arrow codes every xterm-compatible program understands. Cmd+letter shortcuts travel as Kitty keyboard-protocol sequences carrying the Cmd modifier.
+First, iTerm2 key mappings translate your keypresses into sequences each target already understands. Arrow selection uses xterm modified-arrow codes. Cmd+A/C/V and redo use CSI-u sequences carrying the Cmd modifier. Cmd+X and Option+Backspace use stock Ctrl+X and Ctrl+W bytes so the unmodified Hermes Ink TUI handles them directly.
 
 Second, the receiving ends interpret those sequences. A zsh snippet (installed into your `~/.zshrc`) implements selection with zsh's own highlight engine plus clipboard through `pbcopy`/`pbpaste`. The Hermes side is a small Python module that plugs into the CLI's documented keybinding hook and adds only what's missing there: select-all, copy, cut, paste, and redo. Character, word, and line selection need no custom code because prompt_toolkit already implements shift-selection natively.
 
@@ -52,6 +52,7 @@ All shortcuts act on the line you're editing.
 | Option+Shift+Left / Right | Select one word |
 | Cmd+Left / Right | Move to start / end of line |
 | Option+Left / Right | Move one word |
+| Option+Delete | Delete the previous word |
 | Cmd+A | Select all |
 | Cmd+Shift+A | Select the whole terminal, including scrollback (iTerm2's own Select All) |
 | Cmd+C | Copy selection (interrupts when nothing is selected) |

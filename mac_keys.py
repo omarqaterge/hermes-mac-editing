@@ -1,12 +1,15 @@
 """Mac-style editing keybindings for the Hermes classic CLI prompt.
 
 iTerm2 side (installed by ``hermes mac-editing install``) sends standard
-xterm modified-arrow sequences plus CSI-u sequences for Cmd+letter keys:
+xterm modified-arrow sequences, CSI-u sequences for Cmd+letter keys, and
+stock control bytes where Hermes TUI already has the required action:
 
   Shift+Left/Right            -> ESC [ 1 ; 2 D/C   (char select, native)
   Cmd+Shift+Left/Right        -> ESC [ 1 ; 2 H/F   (line select, native)
-  Option+Shift+Left/Right     -> ESC [ 1 ; 6 D/C   (word select, native)
-  Cmd+A / C / X / V           -> ESC [ 97/99/120/118 ; 9 u
+  Option+Shift+Left/Right     -> ESC [ 1 ; 4 D/C   (Meta+Shift word select)
+  Cmd+A / C / V               -> ESC [ 97/99/118 ; 9 u
+  Cmd+X                       -> Ctrl+X            (cut)
+  Option+Backspace            -> Ctrl+W            (delete previous word)
   Cmd+Shift+Z (redo)          -> ESC [ 90 ; 10 u
 
 Arrow selection needs no custom code: prompt_toolkit's emacs bindings
@@ -29,6 +32,14 @@ CSI_U_SEQUENCES = {
     "\x1b[90;10u": (Keys.F24, "mac-redo"),
 }
 
+# Option+Shift arrows must be Meta+Shift for the Ink TUI, but prompt_toolkit's
+# word-selection handlers are named ControlShiftLeft/Right. Normalize only in
+# the classic CLI parser; iTerm still sends the TUI-correct Meta+Shift bytes.
+WORD_SELECT_SEQUENCES = {
+    "\x1b[1;4D": Keys.ControlShiftLeft,
+    "\x1b[1;4C": Keys.ControlShiftRight,
+}
+
 # Cmd+Z arrives as CSI-u super+z. Decode it straight to ControlUnderscore so
 # the stock emacs ``c-_`` undo binding fires with no extra handler.
 UNDO_SEQUENCE = "\x1b[122;9u"
@@ -45,6 +56,7 @@ def _ensure_sequences() -> None:
 
     for sequence, (fkey, _name) in CSI_U_SEQUENCES.items():
         ANSI_SEQUENCES.setdefault(sequence, (Keys.Escape, fkey))
+    ANSI_SEQUENCES.update(WORD_SELECT_SEQUENCES)
     ANSI_SEQUENCES.setdefault(UNDO_SEQUENCE, Keys.ControlUnderscore)
 
 
@@ -109,6 +121,7 @@ def register_macos_editing(kb) -> None:
             # No selection: preserve Ctrl+C interrupt semantics.
             event.key_processor.feed(KeyPress(Keys.ControlC, "\x03"), first=True)
 
+    @kb.add("c-x", eager=True)
     @kb.add("escape", "f22", eager=True)
     def _cut(event) -> None:
         buff = event.current_buffer

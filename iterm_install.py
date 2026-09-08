@@ -5,9 +5,11 @@ them up on restart)::
 
   Shift+Left / Right          ESC [1;2D / [1;2C   char select
   Cmd+Shift+Left / Right      ESC [1;2H / [1;2F   line select
-  Option+Shift+Left / Right   ESC [1;6D / [1;6C   word select
-  Cmd+A / C / X / V           ESC [97/99/120/118;9u
-  Cmd+Shift+Z                 ESC [90;10u         redo
+  Option+Shift+Left / Right   ESC [1;4D / [1;4C   word select
+  Cmd+A / C / V              ESC [97/99/118;9u
+  Cmd+X                      Ctrl+X              cut (stock TUI-compatible)
+  Option+Backspace           Ctrl+W              delete previous word
+  Cmd+Shift+Z                ESC [90;10u          redo
 
 Untouched on purpose: Cmd+Left/Right (0x01/0x05 line nav), Option+Left/Right
 (ESC b/f word nav), Cmd+Z (0x1f undo), all deletions, Cmd+C/V menu behaviour
@@ -33,11 +35,11 @@ MAPPINGS: dict[str, tuple[int, str]] = {
     "0xf703-0x220000": (10, "[1;2C"),
     "0xf702-0x320000": (10, "[1;2H"),
     "0xf703-0x320000": (10, "[1;2F"),
-    "0xf702-0x2a0000": (10, "[1;6D"),
-    "0xf703-0x2a0000": (10, "[1;6C"),
+    "0xf702-0x2a0000": (10, "[1;4D"),
+    "0xf703-0x2a0000": (10, "[1;4C"),
     "0x61-0x100000-0x0": (10, "[97;9u"),
     "0x63-0x100000-0x8": (10, "[99;9u"),
-    "0x78-0x100000-0x7": (10, "[120;9u"),
+    "0x78-0x100000-0x7": (11, "0x18"),
     "0x76-0x100000-0x9": (10, "[118;9u"),
     "0x5a-0x100000-0x6": (10, "[90;10u"),
 }
@@ -47,6 +49,9 @@ MAPPINGS: dict[str, tuple[int, str]] = {
 # recognize as undo) must be overridden here, not globally.
 PROFILE_MAPPINGS: dict[str, tuple[int, str]] = {
     "0x7a-0x100000-0x6": (10, "[122;9u"),
+    # Stock Hermes TUI recognizes Ctrl+W as delete-word-backward. Sending it
+    # here avoids the ESC+DEL tokenizer ambiguity without patching Hermes.
+    "0x7f-0x80000": (11, "0x17"),
 }
 ZSH_MARKER_BEGIN = "# >>> mac-editing (Hermes mac-editing plugin) >>>"
 ZSH_MARKER_END = "# <<< mac-editing (Hermes mac-editing plugin) <<<"
@@ -109,10 +114,13 @@ bindkey $'\\e[1;2D' mac-select-left
 bindkey $'\\e[1;2C' mac-select-right
 bindkey $'\\e[1;2H' mac-select-line-left
 bindkey $'\\e[1;2F' mac-select-line-right
-bindkey $'\\e[1;6D' mac-select-word-left
-bindkey $'\\e[1;6C' mac-select-word-right
+bindkey $'\\e[1;4D' mac-select-word-left
+bindkey $'\\e[1;4C' mac-select-word-right
 bindkey $'\\e[97;9u' mac-select-all
 bindkey $'\\e[99;9u' mac-copy
+# Cmd+X is translated to Ctrl+X so stock Hermes TUI can cut too.
+bindkey '^X' mac-cut
+# Keep the legacy CSI-u sequence working for existing terminal configs.
 bindkey $'\\e[120;9u' mac-cut
 bindkey $'\\e[118;9u' mac-paste
 bindkey $'\\e[90;10u' redo
