@@ -53,6 +53,7 @@ All shortcuts act on the line you're editing.
 | Cmd+Left / Right | Move to start / end of line |
 | Option+Left / Right | Move one word |
 | Cmd+A | Select all |
+| Cmd+Shift+A | Select the whole terminal, including scrollback (iTerm2's own Select All) |
 | Cmd+C | Copy selection (interrupts when nothing is selected) |
 | Cmd+X | Cut selection |
 | Cmd+V | Paste, replacing any selection |

@@ -154,6 +154,11 @@ def install_iterm() -> dict[str, dict]:
         raise RuntimeError(f"Default iTerm2 profile not found: {exc}")
     for key, (action, text) in PROFILE_MAPPINGS.items():
         profile_map[key] = {"Action": action, "Text": text}
+    # Cmd+Shift+A = iTerm's own Edit > Select All (whole terminal incl.
+    # scrollback). Added as a macOS app shortcut so the menu owns it; our
+    # Cmd+A mapping keeps serving the editable input. Existing entries kept.
+    shortcuts = expected.setdefault("NSUserKeyEquivalents", {})
+    shortcuts["Select All"] = "@$a"
 
     import tempfile
 
@@ -211,6 +216,11 @@ def status() -> list[str]:
         lines.append(f"iTerm2: {len(missing)}/{total} mappings missing: {' '.join(missing)}")
     else:
         lines.append(f"iTerm2: all {total} mappings installed (restart iTerm2 to load).")
+    shortcuts = prefs.get("NSUserKeyEquivalents", {})
+    if shortcuts.get("Select All") == "@$a":
+        lines.append("iTerm2: Cmd+Shift+A selects the whole terminal (Edit > Select All).")
+    else:
+        lines.append("iTerm2: Cmd+Shift+A shortcut NOT installed.")
     zshrc = Path.home() / ".zshrc"
     if zshrc.exists() and ZSH_MARKER_BEGIN in zshrc.read_text():
         lines.append("zsh: snippet installed in ~/.zshrc.")
