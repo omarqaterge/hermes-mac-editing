@@ -1,4 +1,4 @@
 name: mac-editing
-version: 1.0.0
+version: 1.0.1
 description: Standard macOS text-editing shortcuts (selection, clipboard, redo) for the Hermes classic CLI prompt when driven from iTerm2. Includes an installer for the matching iTerm2 key mappings and zsh bindings.
 author: Hermes Agent

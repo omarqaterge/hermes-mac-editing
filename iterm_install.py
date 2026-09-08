@@ -55,12 +55,12 @@ ZSH_SNIPPET = """\
 # >>> mac-editing (Hermes mac-editing plugin) >>>
 # Standard macOS editing for the zsh command line (iTerm2 sends the sequences).
 _mac_anchor() { (( REGION_ACTIVE )) || { MARK=$CURSOR; REGION_ACTIVE=1; } }
-mac-select-left() { _mac_anchor; zle backward-char; }; zle -N mac-select-left
-mac-select-right() { _mac_anchor; zle forward-char; }; zle -N mac-select-right
-mac-select-line-left() { _mac_anchor; zle beginning-of-line; }; zle -N mac-select-line-left
-mac-select-line-right() { _mac_anchor; zle end-of-line; }; zle -N mac-select-line-right
-mac-select-word-left() { _mac_anchor; zle backward-word; }; zle -N mac-select-word-left
-mac-select-word-right() { _mac_anchor; zle forward-word; }; zle -N mac-select-word-right
+mac-select-left() { _mac_anchor; zle .backward-char; }; zle -N mac-select-left
+mac-select-right() { _mac_anchor; zle .forward-char; }; zle -N mac-select-right
+mac-select-line-left() { _mac_anchor; zle .beginning-of-line; }; zle -N mac-select-line-left
+mac-select-line-right() { _mac_anchor; zle .end-of-line; }; zle -N mac-select-line-right
+mac-select-word-left() { _mac_anchor; zle .backward-word; }; zle -N mac-select-word-left
+mac-select-word-right() { _mac_anchor; zle .forward-word; }; zle -N mac-select-word-right
 mac-select-all() { MARK=0; CURSOR=${#BUFFER}; REGION_ACTIVE=1; }; zle -N mac-select-all
 mac-copy() {
   if (( REGION_ACTIVE )); then
@@ -95,6 +95,16 @@ mac-delete() { mac-del-region delete-char-or-list; }; zle -N mac-delete
 mac-kill-word-b() { mac-del-region backward-kill-word; }; zle -N mac-kill-word-b
 mac-kill-line-b() { mac-del-region backward-kill-line; }; zle -N mac-kill-line-b
 mac-kill-line-f() { mac-del-region kill-line; }; zle -N mac-kill-line-f
+# Plain movement must leave highlight mode: zsh keeps REGION_ACTIVE until
+# something clears it, so every cursor move below drops the highlight first.
+# The dotted call reaches the builtin being overridden; args pass through.
+for _mac_w in forward-char backward-char beginning-of-line end-of-line \
+    forward-word backward-word emacs-forward-word emacs-backward-word \
+    up-line-or-history down-line-or-history; do
+  eval "${_mac_w}() { REGION_ACTIVE=0; zle .${_mac_w} \"\$@\"; }"
+  zle -N "${_mac_w}"
+done
+unset _mac_w
 bindkey $'\\e[1;2D' mac-select-left
 bindkey $'\\e[1;2C' mac-select-right
 bindkey $'\\e[1;2H' mac-select-line-left
