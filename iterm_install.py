@@ -7,7 +7,7 @@ them up on restart)::
   Cmd+Shift+Left / Right      ESC [1;2H / [1;2F   line select
   Option+Shift+Left / Right   ESC [1;4D / [1;4C   word select
   Cmd+A / C / V              ESC [97/99/118;9u
-  Cmd+X                      Ctrl+X              cut (stock TUI-compatible)
+  Cmd+X                      Cmd+C then Backspace  cut (stock TUI-compatible)
   Option+Backspace           Ctrl+W              delete previous word
   Cmd+Shift+Z                ESC [90;10u          redo
 
@@ -39,7 +39,10 @@ MAPPINGS: dict[str, tuple[int, str]] = {
     "0xf703-0x2a0000": (10, "[1;4C"),
     "0x61-0x100000-0x0": (10, "[97;9u"),
     "0x63-0x100000-0x8": (10, "[99;9u"),
-    "0x78-0x100000-0x7": (11, "0x18"),
+    # Stock Hermes TUI has copy and selection-deletion handlers but no Cmd+X
+    # handler. Emit Cmd+C then Backspace: copy captures the selected text and
+    # Backspace removes that same selection in TUI, classic CLI, and zsh.
+    "0x78-0x100000-0x7": (11, "0x1b 0x5b 0x39 0x39 0x3b 0x39 0x75 0x7f"),
     "0x76-0x100000-0x9": (10, "[118;9u"),
     "0x5a-0x100000-0x6": (10, "[90;10u"),
 }
@@ -118,9 +121,8 @@ bindkey $'\\e[1;4D' mac-select-word-left
 bindkey $'\\e[1;4C' mac-select-word-right
 bindkey $'\\e[97;9u' mac-select-all
 bindkey $'\\e[99;9u' mac-copy
-# Cmd+X is translated to Ctrl+X so stock Hermes TUI can cut too.
-bindkey '^X' mac-cut
-# Keep the legacy CSI-u sequence working for existing terminal configs.
+# The current Cmd+X mapping emits Cmd+C then Backspace. Keep the legacy
+# dedicated cut sequence working for existing terminal configurations.
 bindkey $'\\e[120;9u' mac-cut
 bindkey $'\\e[118;9u' mac-paste
 bindkey $'\\e[90;10u' redo

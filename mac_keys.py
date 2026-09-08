@@ -8,7 +8,7 @@ stock control bytes where Hermes TUI already has the required action:
   Cmd+Shift+Left/Right        -> ESC [ 1 ; 2 H/F   (line select, native)
   Option+Shift+Left/Right     -> ESC [ 1 ; 4 D/C   (Meta+Shift word select)
   Cmd+A / C / V               -> ESC [ 97/99/118 ; 9 u
-  Cmd+X                       -> Ctrl+X            (cut)
+  Cmd+X                       -> Cmd+C, Backspace  (cut)
   Option+Backspace            -> Ctrl+W            (delete previous word)
   Cmd+Shift+Z (redo)          -> ESC [ 90 ; 10 u
 
@@ -121,7 +121,6 @@ def register_macos_editing(kb) -> None:
             # No selection: preserve Ctrl+C interrupt semantics.
             event.key_processor.feed(KeyPress(Keys.ControlC, "\x03"), first=True)
 
-    @kb.add("c-x", eager=True)
     @kb.add("escape", "f22", eager=True)
     def _cut(event) -> None:
         buff = event.current_buffer

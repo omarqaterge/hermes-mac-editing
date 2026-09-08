@@ -83,8 +83,9 @@ check("mapping:option-shift-left-is-meta-shift",
       iterm_install.MAPPINGS["0xf702-0x2a0000"] == (10, "[1;4D"))
 check("mapping:option-shift-right-is-meta-shift",
       iterm_install.MAPPINGS["0xf703-0x2a0000"] == (10, "[1;4C"))
-check("mapping:cmd-x-is-control-x",
-      iterm_install.MAPPINGS["0x78-0x100000-0x7"] == (11, "0x18"))
+check("mapping:cmd-x-is-copy-then-backspace",
+      iterm_install.MAPPINGS["0x78-0x100000-0x7"] ==
+      (11, "0x1b 0x5b 0x39 0x39 0x3b 0x39 0x75 0x7f"))
 check("mapping:option-delete-is-control-w",
       iterm_install.PROFILE_MAPPINGS.get("0x7f-0x80000") == (11, "0x17"))
 
@@ -122,15 +123,12 @@ handler_for(kb, "escape", KEYS_BY_NAME["mac-copy"])(event)
 check("copy:interrupt-passthrough",
       len(fed) == 1 and fed[0].key == Keys.ControlC)
 
-# 7. Cut removes selection and copies it. Cmd+X emits Control-X so stock
-# Hermes TUI handles it; the classic CLI plugin binds that same byte.
+# 7. Legacy CSI-u cut removes selection and copies it. The current iTerm2
+# mapping performs cut as copy followed by Backspace so stock TUI can handle it.
 event, _ = make_event("hello world", cursor=5)
 event.current_buffer.selection_state = SelectionState(
     original_cursor_position=0, type=SelectionType.CHARACTERS)
-control_x_cut = handler_for(kb, Keys.ControlX)
-check("cut:control-x-bound", control_x_cut is not None)
-if control_x_cut is not None:
-    control_x_cut(event)
+handler_for(kb, "escape", KEYS_BY_NAME["mac-cut"])(event)
 check("cut:text", event.current_buffer.text == " world",
       repr(event.current_buffer.text))
 check("cut:clipboard",
