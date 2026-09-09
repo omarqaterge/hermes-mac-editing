@@ -16,7 +16,8 @@ Untouched on purpose: Cmd+Left/Right (0x01/0x05 line nav), Option+Left/Right
 outside the terminal grid is unchanged because these are key sends, not menu
 rebinds. Note: with Cmd+C remapped, copying scrollback/output text must use
 right-click > Copy or the Edit menu via mouse; Cmd+C now serves the editable
-input (copy selection, or interrupt when there is none).
+input (copy selection; no-op when there is none, reserving interrupt/exit
+for Ctrl+C).
 """
 
 from __future__ import annotations
@@ -75,8 +76,6 @@ mac-copy() {
     local a=$MARK b=$CURSOR
     (( a > b )) && { local t=$a; a=$b; b=$t; }
     print -rn -- "${BUFFER:$a:$((b - a))}" | pbcopy
-  else
-    zle send-break
   fi
 }; zle -N mac-copy
 mac-cut() {
@@ -199,6 +198,84 @@ def install_zsh() -> str:
     return "appended"
 
 
+def _canonical_source(home: Path | None = None) -> Path:
+    return (home or Path.home()) / ".hermes" / "plugins" / "mac-editing"
+
+
+def ensure_profile_links(home: Path | None = None) -> list[str]:
+    """Symlink mac-editing into every Hermes profile's plugins dir.
+
+    Profiles (``hermes -p <name>``, e.g. the ``dean`` wrapper) resolve
+    plugins from their own ``~/.hermes/profiles/<name>/plugins`` directory,
+    so without this link the CSI-u sequences iTerm2 sends for Cmd+C etc.
+    arrive at a prompt that never learned them and leak as literal
+    ``[99;9u`` text. Mirrors the existing antigravity-oauth/model-providers
+    symlink pattern. Idempotent; never clobbers a real directory/file and
+    never raises — returns the profiles newly linked.
+    """
+    try:
+        base = home or Path.home()
+        src = _canonical_source(base)
+        if not src.is_dir():
+            return []
+        profiles = base / ".hermes" / "profiles"
+        if not profiles.is_dir():
+            return []
+        linked: list[str] = []
+        for prof in sorted(profiles.iterdir()):
+            if not prof.is_dir() or prof.name.startswith("."):
+                continue
+            try:
+                if prof.is_symlink():
+                    continue
+                pdir = prof / "plugins"
+                pdir.mkdir(parents=True, exist_ok=True)
+                dest = pdir / "mac-editing"
+                if dest.is_symlink():
+                    try:
+                        if dest.resolve() == src.resolve():
+                            continue
+                    except OSError:
+                        pass
+                    dest.unlink()
+                elif dest.exists():
+                    continue
+                dest.symlink_to(src)
+                linked.append(prof.name)
+            except OSError:
+                continue
+        return linked
+    except Exception:
+        return []
+
+
+def profile_link_status(home: Path | None = None) -> list[str]:
+    """Human-readable lines about per-profile mac-editing links."""
+    try:
+        base = home or Path.home()
+        src = _canonical_source(base)
+        profiles = base / ".hermes" / "profiles"
+        if not profiles.is_dir():
+            return ["profiles: none found."]
+        missing: list[str] = []
+        for prof in sorted(profiles.iterdir()):
+            if not prof.is_dir() or prof.name.startswith(".") or prof.is_symlink():
+                continue
+            dest = prof / "plugins" / "mac-editing"
+            try:
+                ok = dest.is_symlink() and dest.resolve() == src.resolve()
+            except OSError:
+                ok = False
+            if not ok:
+                missing.append(prof.name)
+        if not missing:
+            return ["profiles: mac-editing linked into all profiles."]
+        return [f"profiles: mac-editing missing in: {' '.join(missing)} "
+                "(run `hermes mac-editing install`)."]
+    except Exception as exc:
+        return [f"profiles: unreadable ({exc})"]
+
+
 def status() -> list[str]:
     """Human-readable lines describing install state."""
     lines: list[str] = []
@@ -238,4 +315,5 @@ def status() -> list[str]:
         lines.append("zsh: snippet NOT in ~/.zshrc.")
     lines.append("Hermes CLI: active when this plugin is loaded (no core files touched).")
     lines.append("Hermes TUI/Ink: Cmd+Z/A/C/X/V + arrows via iTerm mappings (no core change).")
+    lines.extend(profile_link_status())
     return lines

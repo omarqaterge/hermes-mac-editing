@@ -13,9 +13,14 @@ stock control bytes where Hermes TUI already has the required action:
   Cmd+Shift+Z (redo)          -> ESC [ 90 ; 10 u
 
 Arrow selection needs no custom code: prompt_toolkit's emacs bindings
-implement shift-selection (extend, shrink, type-to-replace, delete
-selection) natively. This module only registers the CSI-u sequences the
-parser does not know and binds the clipboard/select-all/redo handlers.
+implement shift-selection (extend, shrink, type-to-replace) natively.
+Backspace is the exception: stock ``backward-delete-char`` ignores an
+active selection and removes a single character, which also broke Cmd+X
+(iTerm2 sends Cmd+C then Backspace: copy kept the selection, Backspace
+deleted one char instead of the selection). This module registers the
+CSI-u sequences the parser does not know, binds the
+clipboard/select-all/redo handlers, and makes Backspace delete the
+active selection.
 """
 
 from __future__ import annotations
@@ -90,7 +95,7 @@ def _selection_text(buff) -> str:
 def register_macos_editing(kb) -> None:
     """Add Mac clipboard/select-all/redo bindings to a prompt_toolkit KeyBindings."""
     from prompt_toolkit.clipboard import ClipboardData
-    from prompt_toolkit.key_binding.key_processor import KeyPress
+    from prompt_toolkit.filters import has_selection
     from prompt_toolkit.keys import Keys
 
     _ensure_sequences()
@@ -117,9 +122,8 @@ def register_macos_editing(kb) -> None:
             except Exception:
                 pass
             # Mac copy keeps the selection active.
-        else:
-            # No selection: preserve Ctrl+C interrupt semantics.
-            event.key_processor.feed(KeyPress(Keys.ControlC, "\x03"), first=True)
+        # No selection: no-op on macOS (Cmd+C should never exit or interrupt;
+        # Ctrl+C alone handles interrupt/exit).
 
     @kb.add("escape", "f22", eager=True)
     def _cut(event) -> None:
@@ -147,3 +151,14 @@ def register_macos_editing(kb) -> None:
     @kb.add("escape", "f24", eager=True)
     def _redo(event) -> None:
         event.current_buffer.redo()
+
+    # DEL (0x7f) arrives as ControlH. Stock backward-delete-char ignores an
+    # active selection, so Cmd+X (copy, keep selection, Backspace) copied
+    # then removed a single char. With a selection, remove the whole
+    # selection instead — standard macOS behaviour. No selection: this
+    # binding's filter misses and the stock handler runs untouched.
+    # Registered last so it wins over the stock c-h binding when selected
+    # (prompt_toolkit picks the last matching binding).
+    @kb.add("c-h", filter=has_selection)
+    def _delete_selection(event) -> None:
+        event.current_buffer.cut_selection()

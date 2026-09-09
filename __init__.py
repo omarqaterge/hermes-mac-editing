@@ -45,13 +45,18 @@ def _setup_argparse(subparser) -> None:
 
 
 def _handle_cli(args) -> int:
-    from iterm_install import install_iterm, install_zsh, status
+    from iterm_install import ensure_profile_links, install_iterm, install_zsh, status
 
     cmd = getattr(args, "mac_editing_command", None)
     if cmd == "install":
         applied = install_iterm()
         print(f"iTerm2: wrote {len(applied)} key mappings (restart iTerm2 with Cmd+Q to load).")
         print(f"zsh: snippet {install_zsh()} in ~/.zshrc (open a new shell to load).")
+        linked = ensure_profile_links()
+        if linked:
+            print(f"profiles: linked mac-editing into: {' '.join(linked)}.")
+        else:
+            print("profiles: mac-editing already linked into all profiles.")
         print("Hermes CLI: keybindings attach automatically via this plugin.")
         print("Hermes TUI/Ink: Cmd+Z/A/C/X/V + arrows via iTerm mappings.")
         return 0
@@ -62,6 +67,12 @@ def _handle_cli(args) -> int:
 
 def register(ctx) -> None:
     _install_key_hook()
+    try:
+        from iterm_install import ensure_profile_links
+
+        ensure_profile_links()
+    except Exception:
+        pass
     ctx.register_cli_command(
         name="mac-editing",
         help="Standard macOS text editing for iTerm2 + zsh + Hermes CLI",

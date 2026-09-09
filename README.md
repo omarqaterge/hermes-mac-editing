@@ -10,7 +10,7 @@ Terminal emulators don't have native text fields, so macOS shortcuts can't work 
 
 First, iTerm2 key mappings translate your keypresses into sequences each target already understands. Arrow selection uses xterm modified-arrow codes. Cmd+A/C/V and redo use CSI-u sequences carrying the Cmd modifier. Option+Backspace uses Ctrl+W. Cmd+X emits the already-supported Cmd+C followed by Backspace, giving the unmodified Hermes Ink TUI a reliable copy-then-delete cut operation.
 
-Second, the receiving ends interpret those sequences. A zsh snippet (installed into your `~/.zshrc`) implements selection with zsh's own highlight engine plus clipboard through `pbcopy`/`pbpaste`. The Hermes side is a small Python module that plugs into the CLI's documented keybinding hook and adds only what's missing there: select-all, copy, cut, paste, and redo. Character, word, and line selection need no custom code because prompt_toolkit already implements shift-selection natively.
+Second, the receiving ends interpret those sequences. A zsh snippet (installed into your `~/.zshrc`) implements selection with zsh's own highlight engine plus clipboard through `pbcopy`/`pbpaste`. The Hermes side is a small Python module that plugs into the CLI's documented keybinding hook and adds only what's missing there: select-all, copy, cut, paste, redo, and selection-aware Backspace (stock `backward-delete-char` ignores an active selection — without it, the Backspace half of Cmd+X removed one char instead of the selection). Character, word, and line selection need no custom code because prompt_toolkit already implements shift-selection natively.
 
 The Hermes Ink TUI (`hermes --tui`) needs no plugin code at all: it already understands these sequences, it just needed iTerm2 to actually send them. Cmd+Z was the missing one and is included.
 
@@ -55,7 +55,7 @@ All shortcuts act on the line you're editing.
 | Option+Delete | Delete the previous word |
 | Cmd+A | Select all |
 | Cmd+Shift+A | Select the whole terminal, including scrollback (iTerm2's own Select All) |
-| Cmd+C | Copy selection (interrupts when nothing is selected) |
+| Cmd+C | Copy selection (no-op when nothing is selected; Ctrl+C interrupts) |
 | Cmd+X | Cut selection |
 | Cmd+V | Paste, replacing any selection |
 | Cmd+Z / Cmd+Shift+Z | Undo / redo |
@@ -63,9 +63,13 @@ All shortcuts act on the line you're editing.
 
 ## Known trade-offs
 
-Remapping Cmd+C means it now serves the text you're editing: it copies the highlight, or sends an interrupt when there is no highlight (so Ctrl+C behavior is preserved). Copying older terminal output with Cmd+C no longer works; use right-click and Copy for scrollback instead.
+Remapping Cmd+C means it now serves the text you're editing: it copies the highlight, or does nothing when there is no highlight (preventing accidental interrupts or exits — Ctrl+C remains the dedicated interrupt key). Copying older terminal output with Cmd+C no longer works; use right-click and Copy for scrollback instead.
 
 These mappings live in iTerm2's settings, so they apply to iTerm2 sessions only. Other terminals are unaffected and won't gain these shortcuts.
+
+Each Hermes profile (`hermes -p <name>`, e.g. the `dean` wrapper) loads plugins from its own directory, so the plugin symlinks itself into every profile on `hermes mac-editing install` and on each startup. Without that link a profile never learns the Cmd sequences and they leak as literal `[99;9u` text.
+
+No mouse support on purpose: turning on terminal mouse reporting would hijack the scroll wheel (scrolling the transcript would browse input history instead) and clicks can't map to the input reliably — the core disables cursor-position queries, without which prompt_toolkit drops click coordinates. This needs a core change, not a plugin one.
 
 ## Uninstall
 
